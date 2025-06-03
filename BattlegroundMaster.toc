@@ -1,0 +1,20 @@
+## Interface: 30300
+## Title: |cffff4444Battleground|cff4466ffMaster|r
+## Notes: Automates battleground queue management, including Wintergrasp auto-queue.
+## Author: Shadowsinyou
+## Version: 1.4
+## SavedVariables: BGM_DB
+
+Libs\LibStub\LibStub.lua 
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua 
+Libs\AceAddon-3.0\AceAddon-3.0.lua 
+Libs\AceConsole-3.0\AceConsole-3.0.lua 
+Libs\AceEvent-3.0\AceEvent-3.0.lua 
+Libs\AceDB-3.0\AceDB-3.0.lua 
+Libs\AceTimer-3.0\AceTimer-3.0.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+
+core.lua 
+options.lua 
+BattlegroundMaster.lua
