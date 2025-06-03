@@ -65,29 +65,31 @@ function BGMFrame:JoinQueue(bgKey, autoRequeue)
     self:Print("Opening PvP frame for queue: " .. bgInfo.name)
     if not PVPParentFrame or not PVPParentFrame:IsShown() then
         ToggleFrame(PVPParentFrame)
-        if PVPParentFrame and PVPParentFrame:IsShown() then
-            self:Print("PvP frame opened, selecting BG")
-            if autoRequeue and bgKey == "random" then
-                JoinBattlefield(0)
-                self:Print("|cff"..bgInfo.color..bgInfo.name.."|r")
-            else
-                self:SelectBG(bgInfo)
-            end
-        end
-    else
-        self:Print("PvP frame already open, selecting BG")
+        self:Print("PvP frame opened")
+    end
+    if PVPParentFrame and PVPParentFrame:IsShown() then
+        self:Print("PvP frame is visible, selecting BG")
         if autoRequeue and bgKey == "random" then
             JoinBattlefield(0)
             self:Print("|cff"..bgInfo.color..bgInfo.name.."|r")
         else
             self:SelectBG(bgInfo)
         end
+    else
+        self:Print("Error: PvP frame not available")
+        return
     end
 
     -- Track the queue
     if slot then
         self.queueNames[slot] = bgInfo.name
         self:Print("Tracking queue: " .. bgInfo.name .. " at slot " .. slot)
+    end
+
+    -- Close PvP window after queuing, regardless of auto-requeue
+    if PVPParentFrame and PVPParentFrame:IsShown() then
+        ToggleFrame(PVPParentFrame)
+        self:Print("PvP frame closed after queuing")
     end
 end
 
@@ -157,9 +159,6 @@ function BGMFrame:FindAndClickScroll(bgInfo)
                     if PVPBattlegroundFrameJoinButton and PVPBattlegroundFrameJoinButton:IsEnabled() then
                         PVPBattlegroundFrameJoinButton:Click()
                         self:Print("|cff"..bgInfo.color..bgInfo.name.."|r")
-                        if PVPParentFrame and PVPParentFrame:IsShown() then
-                            ToggleFrame(PVPParentFrame)
-                        end
                     else
                         searchAndScroll()
                     end
@@ -205,6 +204,7 @@ end
 BGMFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 BGMFrame:RegisterEvent("CHAT_MSG_BG_SYSTEM_NEUTRAL")
 BGMFrame:RegisterEvent("UPDATE_BATTLEFIELD_STATUS")
+BGMFrame:RegisterEvent("PLAYER_REGEN_ENABLED") -- Detect when out of combat for auto-requeue
 
 BGMFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ZONE_CHANGED_NEW_AREA" then
@@ -222,14 +222,12 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
         self:Print("Received BG system message: " .. message) -- Debug print
         if message:lower():find("wintergrasp") and (message:find("join") or message:find("would you like to")) and BattlegroundMaster.db.profile.autoWintergrasp then
             self:Print("Auto-accepting Wintergrasp queue prompt via chat message.")
-            -- Check if the popup is visible and click it
             local popup = StaticPopup_Visible("CONFIRM_BATTLEFIELD_ENTRY")
             if popup then
                 self:Print("Found CONFIRM_BATTLEFIELD_ENTRY popup, clicking accept!")
                 _G[popup .. "Button1"]:Click()
                 return
             end
-            -- Fallback to direct accept
             for i = 1, MAX_BATTLEFIELD_QUEUES do
                 local status, mapName = GetBattlefieldStatus(i)
                 self:Print("Slot " .. i .. ": Status=" .. (status or "none") .. ", Map=" .. (mapName or "none")) -- Debug print
@@ -247,11 +245,31 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
         if status == "confirm" and mapName and mapName:lower():find("wintergrasp") and BattlegroundMaster.db.profile.autoWintergrasp then
             self:Print("Wintergrasp queue confirm detected via status update, accepting!")
             AcceptBattlefieldPort(index, true)
-            -- Double-check with popup click
             local popup = StaticPopup_Visible("CONFIRM_BATTLEFIELD_ENTRY")
             if popup then
                 self:Print("Found CONFIRM_BATTLEFIELD_ENTRY popup via status update, clicking accept!")
                 _G[popup .. "Button1"]:Click()
+            end
+        end
+        -- Check for auto-requeue condition
+        if BattlegroundMaster.db.profile.autoRequeue and status == "none" and self.lastQueuedBG then
+            self:Print("Auto-requeue triggered for " .. self.lastQueuedBG)
+            self:JoinQueue(self.lastQueuedBG, true)
+        end
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        -- Trigger auto-requeue after combat ends
+        if BattlegroundMaster.db.profile.autoRequeue and self.lastQueuedBG then
+            self:Print("Out of combat, checking for auto-requeue")
+            local queued = false
+            for i = 1, MAX_BATTLEFIELD_QUEUES do
+                if self.queueNames[i] then
+                    queued = true
+                    break
+                end
+            end
+            if not queued then
+                self:Print("No active queues, re-queueing " .. self.lastQueuedBG)
+                self:JoinQueue(self.lastQueuedBG, true)
             end
         end
     end
@@ -296,14 +314,12 @@ function BGMFrame:CreateGUI()
     end)
 
     local buttonY = -90
-    -- Create a table of BG keys excluding Wintergrasp
     local bgKeys = {}
     for key, bgInfo in pairs(BG_DATA) do
         if key ~= "wintergrasp" then
             table.insert(bgKeys, key)
         end
     end
-    -- Sort keys based on name, but place "random" first
     table.sort(bgKeys, function(a, b)
         if a == "random" then return true
         elseif b == "random" then return false
@@ -397,7 +413,6 @@ function BGMFrame:Command(msg)
     if cmd == "" then
         self:ToggleGUI()
     elseif cmd == "joinwintergrasp" then
-        -- Manual command to join Wintergrasp queue
         for i = 1, MAX_BATTLEFIELD_QUEUES do
             local status, mapName = GetBattlefieldStatus(i)
             if status == "confirm" and mapName and mapName:lower():find("wintergrasp") then
@@ -463,7 +478,6 @@ function BGMFrame:Command(msg)
     end
 end
 
--- Register slash commands
 SlashCmdList["BattlegroundMaster"] = function(msg) BGMFrame:Command(msg) end
 SLASH_BattlegroundMaster1 = "/battlegroundmaster"
 SLASH_BattlegroundMaster2 = "/bm"
