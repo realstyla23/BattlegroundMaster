@@ -3,7 +3,7 @@ BGMFrame.queueNames = BGMFrame.queueNames or {}
 BGMFrame.lastQueuedBG = nil -- Track last queued BG for auto-requeue
 BGMFrame.inWintergrasp = false -- Track if in Wintergrasp for polling
 
--- Enhanced BG Data with better matching and scroll direction
+-- BG Data without slot numbers, as we’ll use the PvP frame for all queuing
 local BG_DATA = {
     ["av"] = { name = "Alterac Valley", color = "3399ff", pattern = "alterac", scrollUp = true },
     ["wsg"] = { name = "Warsong Gulch", color = "ff0000", pattern = "warsong", scrollUp = true },
@@ -20,8 +20,9 @@ BGMFrame.Print = function(self, msg)
     BattlegroundMaster:Print(msg)
 end
 
--- Core Functions
-function BGMFrame:JoinQueue(bgKey, autoRequeue)
+-- JoinQueue function for manual queuing
+function BGMFrame:JoinQueue(bgKey)
+    self:Print("Set lastQueuedBG to " .. bgKey)
     local bgInfo = BG_DATA[bgKey:lower()]
     if not bgInfo then
         self:Print("Invalid BG. Use: av, wsg, ab, eots, sota, ioc, random, wintergrasp")
@@ -36,9 +37,7 @@ function BGMFrame:JoinQueue(bgKey, autoRequeue)
         end
     end
 
-    if not autoRequeue then
-        self.lastQueuedBG = bgKey
-    end
+    self.lastQueuedBG = bgKey
 
     -- Clear any stale queue entries
     for i = 1, MAX_BATTLEFIELD_QUEUES do
@@ -58,39 +57,62 @@ function BGMFrame:JoinQueue(bgKey, autoRequeue)
         end
     end
     if not foundSlot then
-        self:Print("No available queue slots for "..bgInfo.name)
+        self:Print("No available queue slots for " .. bgInfo.name)
         return
     end
 
-    self:Print("Opening PvP frame for queue: " .. bgInfo.name)
-    if not PVPParentFrame or not PVPParentFrame:IsShown() then
-        ToggleFrame(PVPParentFrame)
-        self:Print("PvP frame opened")
+    -- Check if player is in a battleground or active battlefield
+    if UnitInBattleground("player") then
+        self:Print("Cannot queue: Player is still in a battleground.")
+        return
     end
-    if PVPParentFrame and PVPParentFrame:IsShown() then
-        self:Print("PvP frame is visible, selecting BG")
-        if autoRequeue and bgKey == "random" then
-            JoinBattlefield(0)
-            self:Print("|cff"..bgInfo.color..bgInfo.name.."|r")
-        else
-            self:SelectBG(bgInfo)
+    if GetBattlefieldStatus(1) == "active" then
+        self:Print("Cannot queue: Active battlefield detected.")
+        return
+    end
+
+    -- Attempt to open and interact with the PvP frame with retries
+    local function attemptQueue(attempts)
+        attempts = attempts or 1
+        local maxAttempts = 5
+        local delay = 5 -- Delay in seconds between attempts
+
+        if attempts > maxAttempts then
+            self:Print("Failed to queue for " .. bgInfo.name)
+            return
         end
-    else
-        self:Print("Error: PvP frame not available")
-        return
+
+        if not PVPParentFrame or not PVPParentFrame:IsShown() then
+            ToggleFrame(PVPParentFrame)
+        end
+
+        if PVPParentFrame and PVPParentFrame:IsShown() then
+            if bgKey == "random" then
+                JoinBattlefield(0)
+                self:Print("|cff" .. bgInfo.color .. bgInfo.name .. "|r")
+            else
+                self:SelectBG(bgInfo)
+            end
+        else
+            C_Timer.After(delay, function()
+                attemptQueue(attempts + 1)
+            end)
+            return
+        end
+
+        -- Track the queue
+        if slot then
+            self.queueNames[slot] = bgInfo.name
+        end
+
+        -- Close PvP window
+        if PVPParentFrame and PVPParentFrame:IsShown() then
+            ToggleFrame(PVPParentFrame)
+        end
     end
 
-    -- Track the queue
-    if slot then
-        self.queueNames[slot] = bgInfo.name
-        self:Print("Tracking queue: " .. bgInfo.name .. " at slot " .. slot)
-    end
-
-    -- Close PvP window after queuing, regardless of auto-requeue
-    if PVPParentFrame and PVPParentFrame:IsShown() then
-        ToggleFrame(PVPParentFrame)
-        self:Print("PvP frame closed after queuing")
-    end
+    -- Start the queuing process
+    attemptQueue()
 end
 
 function BGMFrame:LeaveQueue(bgKey)
@@ -100,12 +122,12 @@ function BGMFrame:LeaveQueue(bgKey)
             if status and (status == "queued" or status == "confirm") then
                 AcceptBattlefieldPort(i, false) -- False to leave the queue
                 self.queueNames[i] = nil
-                self:Print("Left queue for "..BG_DATA[bgKey].name)
+                self:Print("Left queue for " .. BG_DATA[bgKey].name)
                 return
             end
         end
     end
-    self:Print("Not queued for "..BG_DATA[bgKey].name)
+    self:Print("Not queued for " .. BG_DATA[bgKey].name)
 end
 
 function BGMFrame:GetBGKeyFromName(bgName)
@@ -127,40 +149,38 @@ end
 function BGMFrame:FindAndClickScroll(bgInfo)
     local scrollFrame = _G["PVPBattlegroundFrameTypeScrollFrame"]
     if not scrollFrame then
-        self:Print("Error: Scroll frame not found.")
+        self:Print("Failed to queue for " .. bgInfo.name)
         return
     end
 
     local scrollUpButton = _G["PVPBattlegroundFrameTypeScrollFrameScrollBarScrollUpButton"]
     local scrollDownButton = _G["PVPBattlegroundFrameTypeScrollFrameScrollBarScrollDownButton"]
     if not scrollUpButton or not scrollDownButton then
-        self:Print("Error: Scroll buttons not found.")
+        self:Print("Failed to queue for " .. bgInfo.name)
         return
     end
 
-    local maxAttempts = 10
+    local maxAttempts = 15
     local attempt = 0
     local scrollAttempts = 0
-    local maxScrollAttempts = 5
+    local maxScrollAttempts = 10
 
     local function searchAndScroll()
         attempt = attempt + 1
         if attempt > maxAttempts then
-            self:Print("Error: Could not find " .. bgInfo.name .. " in the list.")
+            self:Print("Failed to queue for " .. bgInfo.name)
             return
         end
 
         for i = 1, 5 do
-            local btn = _G["BattlegroundType"..i]
+            local btn = _G["BattlegroundType" .. i]
             if btn and btn:IsShown() then
-                local buttonText = _G[btn:GetName().."Text"] and _G[btn:GetName().."Text"]:GetText() or "No Text"
+                local buttonText = _G[btn:GetName() .. "Text"] and _G[btn:GetName() .. "Text"]:GetText() or ""
                 if buttonText:lower():find(bgInfo.pattern) then
                     btn:Click()
                     if PVPBattlegroundFrameJoinButton and PVPBattlegroundFrameJoinButton:IsEnabled() then
                         PVPBattlegroundFrameJoinButton:Click()
-                        self:Print("|cff"..bgInfo.color..bgInfo.name.."|r")
-                    else
-                        searchAndScroll()
+                        self:Print("|cff" .. bgInfo.color .. bgInfo.name .. "|r")
                     end
                     return
                 end
@@ -174,14 +194,15 @@ function BGMFrame:FindAndClickScroll(bgInfo)
             else
                 scrollDownButton:Click()
             end
-            searchAndScroll()
+            C_Timer.After(0.1, searchAndScroll)
         end
     end
 
+    -- Reset scroll position to top
     for i = 1, maxScrollAttempts do
         scrollUpButton:Click()
     end
-    searchAndScroll()
+    C_Timer.After(0.1, searchAndScroll)
 end
 
 -- Polling Function for Wintergrasp Queue
@@ -200,11 +221,10 @@ local function PollForWintergraspQueue()
     C_Timer.After(1, PollForWintergraspQueue)
 end
 
--- Event Handling for Wintergrasp Auto-Queue
+-- Consolidated Event Handling
 BGMFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 BGMFrame:RegisterEvent("CHAT_MSG_BG_SYSTEM_NEUTRAL")
 BGMFrame:RegisterEvent("UPDATE_BATTLEFIELD_STATUS")
-BGMFrame:RegisterEvent("PLAYER_REGEN_ENABLED") -- Detect when out of combat for auto-requeue
 
 BGMFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ZONE_CHANGED_NEW_AREA" then
@@ -216,24 +236,23 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
             PollForWintergraspQueue() -- Start polling
         else
             self.inWintergrasp = false
+            if BattlegroundMaster.db.profile.autoWintergrasp then
+                self:Print("Wintergrasp auto-queue only works in Wintergrasp. Current zone: " .. zone .. ".")
+            end
         end
     elseif event == "CHAT_MSG_BG_SYSTEM_NEUTRAL" then
         local message = ...
-        self:Print("Received BG system message: " .. message) -- Debug print
         if message:lower():find("wintergrasp") and (message:find("join") or message:find("would you like to")) and BattlegroundMaster.db.profile.autoWintergrasp then
             self:Print("Auto-accepting Wintergrasp queue prompt via chat message.")
             local popup = StaticPopup_Visible("CONFIRM_BATTLEFIELD_ENTRY")
             if popup then
-                self:Print("Found CONFIRM_BATTLEFIELD_ENTRY popup, clicking accept!")
                 _G[popup .. "Button1"]:Click()
                 return
             end
             for i = 1, MAX_BATTLEFIELD_QUEUES do
                 local status, mapName = GetBattlefieldStatus(i)
-                self:Print("Slot " .. i .. ": Status=" .. (status or "none") .. ", Map=" .. (mapName or "none")) -- Debug print
                 if status == "confirm" and mapName and mapName:lower():find("wintergrasp") then
                     AcceptBattlefieldPort(i, true)
-                    self:Print("Wintergrasp queue accepted instantly via chat event!")
                     return
                 end
             end
@@ -241,36 +260,23 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "UPDATE_BATTLEFIELD_STATUS" then
         local index = ...
         local status, mapName = GetBattlefieldStatus(index)
-        self:Print("Battlefield status updated: Slot " .. index .. ", Status=" .. (status or "none") .. ", Map=" .. (mapName or "none")) -- Debug print
         if status == "confirm" and mapName and mapName:lower():find("wintergrasp") and BattlegroundMaster.db.profile.autoWintergrasp then
             self:Print("Wintergrasp queue confirm detected via status update, accepting!")
             AcceptBattlefieldPort(index, true)
             local popup = StaticPopup_Visible("CONFIRM_BATTLEFIELD_ENTRY")
             if popup then
-                self:Print("Found CONFIRM_BATTLEFIELD_ENTRY popup via status update, clicking accept!")
                 _G[popup .. "Button1"]:Click()
             end
         end
-        -- Check for auto-requeue condition
-        if BattlegroundMaster.db.profile.autoRequeue and status == "none" and self.lastQueuedBG then
-            self:Print("Auto-requeue triggered for " .. self.lastQueuedBG)
-            self:JoinQueue(self.lastQueuedBG, true)
-        end
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        -- Trigger auto-requeue after combat ends
-        if BattlegroundMaster.db.profile.autoRequeue and self.lastQueuedBG then
-            self:Print("Out of combat, checking for auto-requeue")
-            local queued = false
-            for i = 1, MAX_BATTLEFIELD_QUEUES do
-                if self.queueNames[i] then
-                    queued = true
-                    break
-                end
-            end
-            if not queued then
-                self:Print("No active queues, re-queueing " .. self.lastQueuedBG)
-                self:JoinQueue(self.lastQueuedBG, true)
-            end
+    
+        if status == "none" and self.queueNames[index] and BattlegroundMaster.db.profile.autoRequeue and self.lastQueuedBG then
+            self:Print("Auto-requeue for " .. self.lastQueuedBG .. " in 5 seconds...")
+            C_Timer.After(5, function()
+                if UnitInBattleground("player") then return end
+                if GetBattlefieldStatus(1) == "active" then return end
+                self:Command(self.lastQueuedBG) -- Re-run the original command
+                self.queueNames[index] = BG_DATA[self.lastQueuedBG:lower()].name -- Reset the slot
+            end)
         end
     end
 end)
@@ -278,6 +284,7 @@ end)
 -- GUI Creation
 function BGMFrame:CreateGUI()
     local frame = CreateFrame("Frame", "BattlegroundMasterGUI", UIParent, "BasicFrameTemplateWithInset")
+    self.guiFrame = frame 
     frame:SetSize(300, 400)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
@@ -299,7 +306,7 @@ function BGMFrame:CreateGUI()
     frame.autoRequeueCheck:SetChecked(BattlegroundMaster.db.profile.autoRequeue)
     frame.autoRequeueCheck:SetScript("OnClick", function(self)
         BattlegroundMaster.db.profile.autoRequeue = self:GetChecked()
-        BGMFrame:Print("Auto-requeue "..(BattlegroundMaster.db.profile.autoRequeue and "enabled" or "disabled")..".")
+        BGMFrame:Print("Auto-requeue " .. (BattlegroundMaster.db.profile.autoRequeue and "enabled" or "disabled") .. ".")
     end)
 
     frame.autoWintergraspCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
@@ -310,7 +317,7 @@ function BGMFrame:CreateGUI()
     frame.autoWintergraspCheck:SetChecked(BattlegroundMaster.db.profile.autoWintergrasp)
     frame.autoWintergraspCheck:SetScript("OnClick", function(self)
         BattlegroundMaster.db.profile.autoWintergrasp = self:GetChecked()
-        BGMFrame:Print("Wintergrasp auto-queue "..(BattlegroundMaster.db.profile.autoWintergrasp and "enabled" or "disabled").." (only active in Wintergrasp zone).")
+        BGMFrame:Print("Wintergrasp auto-queue " .. (BattlegroundMaster.db.profile.autoWintergrasp and "enabled" or "disabled") .. " (only active in Wintergrasp zone).")
     end)
 
     local buttonY = -90
@@ -391,9 +398,6 @@ function BGMFrame:CreateGUI()
     resetStatsButton:SetScript("OnClick", function()
         BattlegroundMaster:ResetStats()
     end)
-
-    frame:Hide()
-    self.guiFrame = frame
 end
 
 function BGMFrame:ToggleGUI()
@@ -452,7 +456,7 @@ function BGMFrame:Command(msg)
         end
     elseif cmd == "autorequeue" then
         BattlegroundMaster.db.profile.autoRequeue = not BattlegroundMaster.db.profile.autoRequeue
-        self:Print("Auto-requeue "..(BattlegroundMaster.db.profile.autoRequeue and "enabled" or "disabled")..".")
+        self:Print("Auto-requeue " .. (BattlegroundMaster.db.profile.autoRequeue and "enabled" or "disabled") .. ".")
         if self.guiFrame then
             self.guiFrame.autoRequeueCheck:SetChecked(BattlegroundMaster.db.profile.autoRequeue)
         end

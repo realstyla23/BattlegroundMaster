@@ -47,16 +47,12 @@ function BattlegroundMaster:OnInitialize()
     self:RegisterEvent("PLAYER_LOGIN")
     self:RegisterEvent("PLAYER_PVP_KILLS_CHANGED")
     self:RegisterEvent("UPDATE_BATTLEFIELD_SCORE")
-    self:RegisterEvent("UPDATE_BATTLEFIELD_STATUS")
-    self:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-    self:RegisterEvent("CHAT_MSG_BG_SYSTEM_NEUTRAL")
 
     -- Delay global assignment to ensure Ace3 is done
     C_Timer.After(1, function()
         if not _G.BattlegroundMaster then
             _G.BattlegroundMaster = self
         end
-        -- Ensure the global without _G works
         BattlegroundMaster = _G.BattlegroundMaster
     end)
 
@@ -100,53 +96,12 @@ function BattlegroundMaster:UPDATE_BATTLEFIELD_SCORE()
     end
 end
 
-function BattlegroundMaster:UPDATE_BATTLEFIELD_STATUS()
-    for i = 1, 2 do -- Limit to queue slots 1 and 2
-        local status = GetBattlefieldStatus(i)
-        if status == "queued" and not BGMFrame.queueNames[i] then
-            local name = select(1, GetBattlefieldInfo(i))
-            BGMFrame.queueNames[i] = name or "Unknown"
-        elseif status == "none" then
-            if BGMFrame.queueNames[i] and self.db.profile.autoRequeue and BGMFrame.lastQueuedBG then
-                self:Print("Attempting auto-requeue for: " .. BGMFrame.lastQueuedBG)
-                self:ScheduleTimer(function()
-                    BGMFrame:JoinQueue(BGMFrame.lastQueuedBG, true)
-                end, 2)
-            end
-            BGMFrame.queueNames[i] = nil
-        end
-    end
-end
-
-function BattlegroundMaster:ZONE_CHANGED_NEW_AREA()
-    if self.db.profile.autoWintergrasp then
-        local zone = GetZoneText()
-        if zone == "Wintergrasp" then
-            BGMFrame:Print("Entered Wintergrasp, Wintergrasp auto-queue enabled.")
-        else
-            BGMFrame:Print("Wintergrasp auto-queue only works in Warmane. Current zone: "..zone..".")
-        end
-    end
-end
-
-function BattlegroundMaster:CHAT_MSG_BG_SYSTEM_NEUTRAL(msg)
-    if self.db.profile.autoWintergrasp and msg:find("Would you like to join the queue for Wintergrasp") then
-        local zone = GetZoneText()
-        if zone == "Wintergrasp" then
-            BGMFrame:Print("Auto-accepting Wintergrasp queue prompt.")
-            RunMacroText("/click StaticPopup1Button1")
-        else
-            BGMFrame:Print("Received Wintergrasp invite, but not in zone. Ignoring.")
-        end
-    end
-end
-
 function BattlegroundMaster:Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99BattlegroundMaster|r: "..msg)
 end
 
 function BattlegroundMaster:ShowSessionStats()
-    self:Print("Session Honor: "..(self.db.profile.sessionHonor or 0)..". | Session Kills: "..(self.db.profile.sessionKills or 0)..".")
+    self:Print("Session Honor: "..(self.db.profile.sessionHonor or 0)..". | Session Kills: "..(self.db.profile.sessionKills or 0)..".") 
 end
 
 function BattlegroundMaster:ResetStats()
