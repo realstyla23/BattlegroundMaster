@@ -16,6 +16,10 @@ function BattlegroundMaster:OnInitialize()
             lastHonor = 0,
             wins = 0,
             losses = 0,
+            lifetimeHonor = 0, -- New: Track lifetime honor
+            lifetimeKills = 0, -- New: Track lifetime kills
+            lifetimeWins = 0,  -- New: Track lifetime wins
+            lifetimeLosses = 0, -- New: Track lifetime losses
             autoRequeueDelay = 5, -- Default delay in seconds
             debugMode = false, -- Debug mode toggle
             autoRequeuePerBG = { -- Per-BG auto-requeue settings
@@ -109,6 +113,7 @@ function BattlegroundMaster:PLAYER_PVP_KILLS_CHANGED()
 
     if delta > 0 then
         self.db.profile.sessionKills = (self.db.profile.sessionKills or 0) + delta
+        self.db.profile.lifetimeKills = (self.db.profile.lifetimeKills or 0) + delta -- Update lifetime kills
         self:Print("Honorable kills gained: "..delta..". Total Session Kills: "..self.db.profile.sessionKills)
     end
 
@@ -120,6 +125,7 @@ function BattlegroundMaster:UPDATE_BATTLEFIELD_SCORE()
     local honorGained = currentHonor - (self.db.profile.lastHonor or 0)
     if honorGained > 0 then
         self.db.profile.sessionHonor = (self.db.profile.sessionHonor or 0) + honorGained
+        self.db.profile.lifetimeHonor = (self.db.profile.lifetimeHonor or 0) + honorGained -- Update lifetime honor
         self.db.profile.lastHonor = currentHonor
         self:Print("Honor gained: "..honorGained..". Total Session Honor: "..self.db.profile.sessionHonor)
     end
@@ -139,6 +145,14 @@ function BattlegroundMaster:ShowSessionStats()
                ". | Losses: "..(self.db.profile.losses or 0)..".")
 end
 
+function BattlegroundMaster:ShowLifetimeStats()
+    self:Print("Lifetime Stats Since Addon Usage:")
+    self:Print("Lifetime Honor: "..(self.db.profile.lifetimeHonor or 0)..
+               ". | Lifetime Kills: "..(self.db.profile.lifetimeKills or 0)..
+               ". | Lifetime Wins: "..(self.db.profile.lifetimeWins or 0)..
+               ". | Lifetime Losses: "..(self.db.profile.lifetimeLosses or 0)..".")
+end
+
 function BattlegroundMaster:ResetStats()
     self.db.profile.sessionHonor = 0
     self.db.profile.sessionKills = 0
@@ -146,4 +160,16 @@ function BattlegroundMaster:ResetStats()
     self.db.profile.wins = 0
     self.db.profile.losses = 0
     self:Print("Session stats reset manually.")
+end
+
+function BattlegroundMaster:IncrementWins()
+    self.db.profile.wins = (self.db.profile.wins or 0) + 1
+    self.db.profile.lifetimeWins = (self.db.profile.lifetimeWins or 0) + 1 -- Update lifetime wins
+    self:Print("Battleground won! Total Session Wins: "..self.db.profile.wins)
+end
+
+function BattlegroundMaster:IncrementLosses()
+    self.db.profile.losses = (self.db.profile.losses or 0) + 1
+    self.db.profile.lifetimeLosses = (self.db.profile.lifetimeLosses or 0) + 1 -- Update lifetime losses
+    self:Print("Battleground lost. Total Session Losses: "..self.db.profile.losses)
 end

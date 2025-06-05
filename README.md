@@ -1,85 +1,49 @@
 # BattlegroundMaster
 
 ## Overview
-
-BattlegroundMaster is a World of Warcraft addon designed for WoW 3.3.5a (Wrath of the Lich King) to automate and simplify battleground queue management. It offers features like auto-requeue, session stat tracking, and a user-friendly GUI, making your PvP experience smoother and more efficient.
+BattlegroundMaster is a World of Warcraft addon designed to simplify battleground queuing and management. It provides a user-friendly GUI to join, leave, and auto-requeue for various battlegrounds, including Wintergrasp, with customizable settings.
 
 ## Features
-
-- **Automated Queuing**: Queue for battlegrounds directly from a GUI or via chat commands (`/bm <bg>`).
-- **Auto-Requeue**: Automatically requeue for battlegrounds after a match ends, with configurable delays and per-BG settings.
-- **Wintergrasp Auto-Queue**: Automatically join Wintergrasp queues when in the zone, with support for auto-accepting prompts.
-- **Session Stats Tracking**: Track honor, kills, wins, and losses for your session, with options to view and reset stats.
-- **Minimap Button**: Toggle the GUI with a minimap button, customizable via settings.
-- **GUI Interface**: A clean, draggable GUI to manage settings, queue for BGs, and view stats.
-- **Settings Panel**: Configure options via Blizzard’s Interface Options (`/bm config`).
-- **Debug Mode**: Optional debug logging for troubleshooting.
+- Queue for specific battlegrounds (Alterac Valley, Warsong Gulch, Arathi Basin, etc.) or random BG.
+- Auto-requeue option for seamless gameplay.
+- Wintergrasp auto-queue support when in the Wintergrasp zone.
+- Display active queues, session stats, lifetime stats, and reset options.
+- Open settings panel for configuration.
 
 ## Installation
-
-1. Download the latest release from GitHub.
-2. Extract the `BattlegroundMaster` folder to your WoW `Interface\AddOns\` directory.
-3. Launch WoW, enable the addon in the character selection screen, and enjoy!
+1. Download the latest release from the [Releases](https://github.com/realstyla23/BattlegroundMaster/releases) section.
+2. Extract the `BattlegroundMaster` folder to your World of Warcraft `_retail_/Interface/AddOns/` directory.
+3. Log in to WoW, ensure the addon is enabled in the AddOns menu, and use `/bm` to open the GUI.
 
 ## Usage
-
-- **Toggle GUI**: Use `/bm` to open/close the GUI.
-- **Queue for a BG**: Use `/bm <bg>` (e.g., `/bm av` for Alterac Valley) or click a BG button in the GUI.
-- **List Active Queues**: Use `/bm list` or the "List Active Queues" button in the GUI.
-- **Auto-Requeue**: Enable via the GUI checkbox or `/bm autorequeue`.
-- **Wintergrasp Auto-Queue**: Enable via the GUI checkbox; works only in Wintergrasp zone.
-- **View Stats**: Use `/bm stats` or the "Show Session Stats" button.
-- **Reset Stats**: Use `/bm resetstats` or the "Reset Session Stats" button.
-- **Open Settings**: Use `/bm config` or the "Open Settings" button to access the settings panel.
-- **Supported BGs**:
-  - Alterac Valley (`av`)
-  - Warsong Gulch (`wsg`)
-  - Arathi Basin (`ab`)
-  - Eye of the Storm (`eots`)
-  - Strand of the Ancients (`sota`)
-  - Isle of Conquest (`ioc`)
-  - Random BG (`random`)
-  - Wintergrasp (`wintergrasp`)
+- **Open GUI**: Type `/bm` in chat.
+- **Queue for BG**: Click a battleground button or use `/bm [bg]` (e.g., `/bm av` for Alterac Valley).
+- **Auto-Requeue**: Enable the "Auto Re-Queue" checkbox to automatically requeue after a match.
+- **Wintergrasp**: Enable "Wintergrasp Queue" in Wintergrasp zone for auto-accept.
+- **Commands**:
+  - `/bm` - Toggle GUI
+  - `/bm av`, `/bm wsg`, etc. - Queue for specific BG
+  - `/bm joinwintergrasp` - Manually accept Wintergrasp queue
+  - `/bm list` - Show active queues
+  - `/bm autorequeue` - Toggle auto-requeue
+  - `/bm stats` - Show session stats
+  - `/bm lifetimestats` - Show lifetime stats
+  - `/bm resetstats` - Reset session stats
+  - `/bm config` - Open settings panel
 
 ## Changelog
-
-### Version 1.3
-- **Settings Panel Fix**: Resolved issues with the settings panel not opening by adding delayed registration and ensuring all Ace3 dependencies are included (`AceConfigRegistry-3.0` and `AceConfigCmd-3.0`).
-- **GUI Improvements**: Adjusted frame size to 300x500 and increased button spacing for better visibility.
-- **Bug Fixes**: Fixed library path issues in the `.toc` file to match the updated folder structure.
-- **Stability Enhancements**: Added debug checks to confirm settings panel registration.
-
-## Dependencies
-
-- **Ace3 Libraries** (included in the `Libs` folder):
-  - LibStub
-  - CallbackHandler-1.0
-  - AceAddon-3.0
-  - AceConsole-3.0
-  - AceEvent-3.0
-  - AceDB-3.0
-  - AceTimer-3.0
-  - AceGUI-3.0
-  - AceConfig-3.0 (with AceConfigRegistry-3.0 and AceConfigCmd-3.0)
-  - AceConfigDialog-3.0
-- **Other Libraries**:
-  - LibDBIcon-1.0
-  - LibDataBroker-1.1
-
-## Known Issues
-
-- Wintergrasp auto-queue requires you to be in the Wintergrasp zone to function.
-- Auto-requeue skips if you have the Deserter debuff or are in an active battlefield.
+### [Latest Update - June 05, 2025]
+- Moved "BattlegroundMaster" title higher for better GUI alignment.
+- Increased button width to 180 pixels to fit longer names (e.g., "Random Battleground", "Strand of the Ancients").
+- Updated frame size to 420x300 for a wider and shorter layout.
+- Ensured all functionality remains intact with the new layout.
 
 ## Contributing
-
-Feel free to fork this repository, make improvements, and submit pull requests. Bug reports and feature requests are welcome via GitHub Issues.
+Feel free to submit issues or pull requests on the [GitHub repository](https://github.com/realstyla23/BattlegroundMaster). Contributions are welcome!
 
 ## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-This addon is released under the MIT License. See the `LICENSE` file for details.
-
-## Credits
-
-- **Author**: Shadowsinyou
-- **Libraries**: Thanks to the Ace3 team and contributors for their amazing libraries.
+## Acknowledgements
+- Thanks to the WoW addon community for inspiration and support.
+- Special thanks to contributors and testers for feedback.
