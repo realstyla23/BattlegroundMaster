@@ -1,7 +1,8 @@
 local BGMFrame = CreateFrame("Frame", "BGMFrame", UIParent)
 BGMFrame.queueNames = BGMFrame.queueNames or {}
-BGMFrame.lastQueuedBG = nil -- Track last queued BG for auto-requeue
+BGMFrame.lastQueuedBG = nil -- Track last queued BG for manual queuing
 BGMFrame.inWintergrasp = false -- Track if in Wintergrasp for polling
+BGMFrame.activeBGs = {} -- Track active battlegrounds for auto-requeue
 
 -- BG Data without slot numbers, as we’ll use the PvP frame for all queuing
 local BG_DATA = {
@@ -20,9 +21,40 @@ BGMFrame.Print = function(self, msg)
     BattlegroundMaster:Print(msg)
 end
 
+-- Helper function to get BG key from map name
+function BGMFrame:GetBGKeyFromMapName(mapName)
+    for key, bg in pairs(BG_DATA) do
+        if bg.name:lower() == mapName:lower() then
+            return key
+        end
+    end
+    return nil
+end
+
+-- Check for deserter debuff
+function BGMFrame:HasDeserterDebuff()
+    for i = 1, 40 do
+        local name = UnitDebuff("player", i)
+        if name and name:lower() == "deserter" then
+            return true
+        end
+    end
+    return false
+end
+
+-- Check if player is in an active battlefield
+function BGMFrame:IsInActiveBattlefield()
+    for i = 1, MAX_BATTLEFIELD_QUEUES do
+        local status = GetBattlefieldStatus(i)
+        if status == "active" then
+            return true
+        end
+    end
+    return false
+end
+
 -- JoinQueue function for manual queuing
 function BGMFrame:JoinQueue(bgKey)
-    self:Print("Set lastQueuedBG to " .. bgKey)
     local bgInfo = BG_DATA[bgKey:lower()]
     if not bgInfo then
         self:Print("Invalid BG. Use: av, wsg, ab, eots, sota, ioc, random, wintergrasp")
@@ -38,36 +70,28 @@ function BGMFrame:JoinQueue(bgKey)
     end
 
     self.lastQueuedBG = bgKey
-
-    -- Clear any stale queue entries
-    for i = 1, MAX_BATTLEFIELD_QUEUES do
-        if self.queueNames[i] and GetBattlefieldStatus(i) == "none" then
-            self.queueNames[i] = nil
-        end
-    end
-
-    -- Find an empty queue slot
-    local foundSlot = false
-    local slot
-    for i = 1, MAX_BATTLEFIELD_QUEUES do
-        if not self.queueNames[i] then
-            foundSlot = true
-            slot = i
-            break
-        end
-    end
-    if not foundSlot then
-        self:Print("No available queue slots for " .. bgInfo.name)
-        return
-    end
+    self:Print("Queuing for " .. bgInfo.name)
 
     -- Check if player is in a battleground or active battlefield
     if UnitInBattleground("player") then
         self:Print("Cannot queue: Player is still in a battleground.")
         return
     end
-    if GetBattlefieldStatus(1) == "active" then
+    if self:IsInActiveBattlefield() then
         self:Print("Cannot queue: Active battlefield detected.")
+        return
+    end
+
+    -- Find an empty queue slot
+    local slot
+    for i = 1, MAX_BATTLEFIELD_QUEUES do
+        if GetBattlefieldStatus(i) == "none" then
+            slot = i
+            break
+        end
+    end
+    if not slot then
+        self:Print("No available queue slots for " .. bgInfo.name)
         return
     end
 
@@ -78,7 +102,7 @@ function BGMFrame:JoinQueue(bgKey)
         local delay = 5 -- Delay in seconds between attempts
 
         if attempts > maxAttempts then
-            self:Print("Failed to queue for " .. bgInfo.name)
+            self:Print("Failed to queue for " .. bgInfo.name .. " after " .. maxAttempts .. " attempts.")
             return
         end
 
@@ -89,20 +113,16 @@ function BGMFrame:JoinQueue(bgKey)
         if PVPParentFrame and PVPParentFrame:IsShown() then
             if bgKey == "random" then
                 JoinBattlefield(0)
-                self:Print("|cff" .. bgInfo.color .. bgInfo.name .. "|r")
+                self:Print("|cff" .. bgInfo.color .. bgInfo.name .. "|r queued.")
             else
                 self:SelectBG(bgInfo)
             end
+            self.queueNames[slot] = bgInfo.name
         else
             C_Timer.After(delay, function()
                 attemptQueue(attempts + 1)
             end)
             return
-        end
-
-        -- Track the queue
-        if slot then
-            self.queueNames[slot] = bgInfo.name
         end
 
         -- Close PvP window
@@ -111,7 +131,6 @@ function BGMFrame:JoinQueue(bgKey)
         end
     end
 
-    -- Start the queuing process
     attemptQueue()
 end
 
@@ -120,7 +139,7 @@ function BGMFrame:LeaveQueue(bgKey)
         if self.queueNames[i] and self:GetBGKeyFromName(self.queueNames[i]) == bgKey then
             local status = GetBattlefieldStatus(i)
             if status and (status == "queued" or status == "confirm") then
-                AcceptBattlefieldPort(i, false) -- False to leave the queue
+                AcceptBattlefieldPort(i, false)
                 self.queueNames[i] = nil
                 self:Print("Left queue for " .. BG_DATA[bgKey].name)
                 return
@@ -149,14 +168,14 @@ end
 function BGMFrame:FindAndClickScroll(bgInfo)
     local scrollFrame = _G["PVPBattlegroundFrameTypeScrollFrame"]
     if not scrollFrame then
-        self:Print("Failed to queue for " .. bgInfo.name)
+        self:Print("Failed to queue for " .. bgInfo.name .. ": Scroll frame not found.")
         return
     end
 
     local scrollUpButton = _G["PVPBattlegroundFrameTypeScrollFrameScrollBarScrollUpButton"]
     local scrollDownButton = _G["PVPBattlegroundFrameTypeScrollFrameScrollBarScrollDownButton"]
     if not scrollUpButton or not scrollDownButton then
-        self:Print("Failed to queue for " .. bgInfo.name)
+        self:Print("Failed to queue for " .. bgInfo.name .. ": Scroll buttons not found.")
         return
     end
 
@@ -168,7 +187,7 @@ function BGMFrame:FindAndClickScroll(bgInfo)
     local function searchAndScroll()
         attempt = attempt + 1
         if attempt > maxAttempts then
-            self:Print("Failed to queue for " .. bgInfo.name)
+            self:Print("Failed to queue for " .. bgInfo.name .. ": Could not find BG after " .. maxAttempts .. " attempts.")
             return
         end
 
@@ -180,7 +199,7 @@ function BGMFrame:FindAndClickScroll(bgInfo)
                     btn:Click()
                     if PVPBattlegroundFrameJoinButton and PVPBattlegroundFrameJoinButton:IsEnabled() then
                         PVPBattlegroundFrameJoinButton:Click()
-                        self:Print("|cff" .. bgInfo.color .. bgInfo.name .. "|r")
+                        self:Print("|cff" .. bgInfo.color .. bgInfo.name .. "|r queued.")
                     end
                     return
                 end
@@ -233,7 +252,7 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
             self:Print("Entered Wintergrasp, Wintergrasp auto-queue enabled.")
             self.inWintergrasp = true
             self:JoinQueue("wintergrasp")
-            PollForWintergraspQueue() -- Start polling
+            PollForWintergraspQueue()
         else
             self.inWintergrasp = false
             if BattlegroundMaster.db.profile.autoWintergrasp then
@@ -260,6 +279,14 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "UPDATE_BATTLEFIELD_STATUS" then
         local index = ...
         local status, mapName = GetBattlefieldStatus(index)
+        
+        if status == "active" then
+            local key = self:GetBGKeyFromMapName(mapName)
+            if key then
+                self.activeBGs[index] = key
+            end
+        end
+        
         if status == "confirm" and mapName and mapName:lower():find("wintergrasp") and BattlegroundMaster.db.profile.autoWintergrasp then
             self:Print("Wintergrasp queue confirm detected via status update, accepting!")
             AcceptBattlefieldPort(index, true)
@@ -268,15 +295,43 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
                 _G[popup .. "Button1"]:Click()
             end
         end
-    
-        if status == "none" and self.queueNames[index] and BattlegroundMaster.db.profile.autoRequeue and self.lastQueuedBG then
-            self:Print("Auto-requeue for " .. self.lastQueuedBG .. " in 5 seconds...")
-            C_Timer.After(5, function()
-                if UnitInBattleground("player") then return end
-                if GetBattlefieldStatus(1) == "active" then return end
-                self:Command(self.lastQueuedBG) -- Re-run the original command
-                self.queueNames[index] = BG_DATA[self.lastQueuedBG:lower()].name -- Reset the slot
-            end)
+        
+        if status == "none" and self.queueNames[index] then
+            -- Win/Loss detection
+            local winner = GetBattlefieldWinner()
+            if winner then
+                local playerFaction = UnitFactionGroup("player")
+                if (winner == 0 and playerFaction == "Horde") or (winner == 1 and playerFaction == "Alliance") then
+                    BattlegroundMaster.db.profile.wins = BattlegroundMaster.db.profile.wins + 1
+                    self:Print("Battleground won! Total Session Wins: " .. BattlegroundMaster.db.profile.wins)
+                else
+                    BattlegroundMaster.db.profile.losses = BattlegroundMaster.db.profile.losses + 1
+                    self:Print("Battleground lost. Total Session Losses: " .. BattlegroundMaster.db.profile.losses)
+                end
+            end
+            
+            -- Auto-requeue logic
+            if BattlegroundMaster.db.profile.autoRequeue then
+                local bgKey = self.activeBGs[index]
+                if bgKey then
+                    -- If originally queued for random, re-queue for random
+                    local requeueKey = (self.lastQueuedBG == "random" and bgKey ~= "wintergrasp") and "random" or bgKey
+                    self:Print("Auto-requeue for " .. BG_DATA[requeueKey].name .. " in 5 seconds...")
+                    C_Timer.After(5, function()
+                        if self:HasDeserterDebuff() then
+                            self:Print("Auto-requeue skipped: Deserter debuff active.")
+                        elseif self:IsInActiveBattlefield() then
+                            self:Print("Auto-requeue skipped: Active battlefield detected.")
+                        else
+                            self:Command(requeueKey)
+                        end
+                    end)
+                else
+                    self:Print("Auto-requeue failed: Could not determine the battleground that ended.")
+                end
+            end
+            self.activeBGs[index] = nil
+            self.queueNames[index] = nil
         end
     end
 end)
@@ -284,7 +339,7 @@ end)
 -- GUI Creation
 function BGMFrame:CreateGUI()
     local frame = CreateFrame("Frame", "BattlegroundMasterGUI", UIParent, "BasicFrameTemplateWithInset")
-    self.guiFrame = frame 
+    self.guiFrame = frame
     frame:SetSize(300, 400)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
@@ -339,8 +394,7 @@ function BGMFrame:CreateGUI()
         button:SetPoint("TOPLEFT", 20, buttonY)
         button:SetText(bgInfo.name)
         button:SetScript("OnClick", function()
-            local status = nil
-            local queueIndex = nil
+            local status, queueIndex
             for i = 1, MAX_BATTLEFIELD_QUEUES do
                 if self.queueNames[i] and self:GetBGKeyFromName(self.queueNames[i]) == bgKey then
                     status = GetBattlefieldStatus(i)
@@ -427,7 +481,7 @@ function BGMFrame:Command(msg)
         end
         self:Print("No Wintergrasp queue prompt found. Ensure you're queued and the prompt is active.")
     elseif BG_DATA[cmd] then
-        local status = nil
+        local status
         for i = 1, MAX_BATTLEFIELD_QUEUES do
             if self.queueNames[i] and self:GetBGKeyFromName(self.queueNames[i]) == cmd then
                 status = GetBattlefieldStatus(i)
@@ -477,7 +531,7 @@ function BGMFrame:Command(msg)
         self:Print("/bm joinwintergrasp - Manually accept Wintergrasp queue")
         self:Print("/bm list - Show active queues")
         self:Print("/bm autorequeue - Toggle auto-requeue")
-        self:Print("/bm stats - Show session honor and kills")
+        self:Print("/bm stats - Show session stats")
         self:Print("/bm resetstats - Reset session stats")
     end
 end

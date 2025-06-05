@@ -2,7 +2,7 @@
 ## Title: |cffff4444Battleground|cff4466ffMaster|r
 ## Notes: Automates battleground queue management, including Wintergrasp auto-queue.
 ## Author: Shadowsinyou
-## Version: 1.1
+## Version: 1.2.1
 ## SavedVariables: BGM_DB
 
 Libs\LibStub\LibStub.lua 

@@ -14,6 +14,8 @@ function BattlegroundMaster:OnInitialize()
             sessionHonor = 0,
             sessionKills = 0,
             lastHonor = 0,
+            wins = 0,
+            losses = 0,
             minimap = {
                 hide = false,
                 minimapPos = 225
@@ -69,6 +71,8 @@ function BattlegroundMaster:PLAYER_LOGIN()
     self.db.profile.sessionHonor = 0
     self.db.profile.sessionKills = 0
     self.db.profile.lastHonor = GetHonorCurrency() or 0
+    self.db.profile.wins = 0
+    self.db.profile.losses = 0
     self.db.profile._lastHKs = GetPVPSessionStats() or 0
     self:Print("Session stats reset on login.")
 end
@@ -101,12 +105,17 @@ function BattlegroundMaster:Print(msg)
 end
 
 function BattlegroundMaster:ShowSessionStats()
-    self:Print("Session Honor: "..(self.db.profile.sessionHonor or 0)..". | Session Kills: "..(self.db.profile.sessionKills or 0)..".") 
+    self:Print("Session Honor: "..(self.db.profile.sessionHonor or 0)..
+               ". | Session Kills: "..(self.db.profile.sessionKills or 0)..
+               ". | Wins: "..(self.db.profile.wins or 0)..
+               ". | Losses: "..(self.db.profile.losses or 0)..".")
 end
 
 function BattlegroundMaster:ResetStats()
     self.db.profile.sessionHonor = 0
     self.db.profile.sessionKills = 0
     self.db.profile.lastHonor = GetHonorCurrency() or 0
+    self.db.profile.wins = 0
+    self.db.profile.losses = 0
     self:Print("Session stats reset manually.")
 end
