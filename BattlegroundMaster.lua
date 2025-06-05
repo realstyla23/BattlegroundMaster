@@ -314,18 +314,23 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
             if BattlegroundMaster.db.profile.autoRequeue then
                 local bgKey = self.activeBGs[index]
                 if bgKey then
-                    -- If originally queued for random, re-queue for random
-                    local requeueKey = (self.lastQueuedBG == "random" and bgKey ~= "wintergrasp") and "random" or bgKey
-                    self:Print("Auto-requeue for " .. BG_DATA[requeueKey].name .. " in 5 seconds...")
-                    C_Timer.After(5, function()
-                        if self:HasDeserterDebuff() then
-                            self:Print("Auto-requeue skipped: Deserter debuff active.")
-                        elseif self:IsInActiveBattlefield() then
-                            self:Print("Auto-requeue skipped: Active battlefield detected.")
-                        else
-                            self:Command(requeueKey)
-                        end
-                    end)
+                    -- Check if auto-requeue is enabled for this BG
+                    if not BattlegroundMaster.db.profile.autoRequeuePerBG[bgKey] then
+                        self:Print("Auto-requeue skipped: Disabled for " .. BG_DATA[bgKey].name .. " in settings.")
+                    else
+                        -- If originally queued for random, re-queue for random
+                        local requeueKey = (self.lastQueuedBG == "random" and bgKey ~= "wintergrasp") and "random" or bgKey
+                        self:Print("Auto-requeue for " .. BG_DATA[requeueKey].name .. " in " .. BattlegroundMaster.db.profile.autoRequeueDelay .. " seconds...")
+                        C_Timer.After(BattlegroundMaster.db.profile.autoRequeueDelay, function()
+                            if self:HasDeserterDebuff() then
+                                self:Print("Auto-requeue skipped: Deserter debuff active.")
+                            elseif self:IsInActiveBattlefield() then
+                                self:Print("Auto-requeue skipped: Active battlefield detected.")
+                            else
+                                self:Command(requeueKey)
+                            end
+                        end)
+                    end
                 else
                     self:Print("Auto-requeue failed: Could not determine the battleground that ended.")
                 end
@@ -340,7 +345,7 @@ end)
 function BGMFrame:CreateGUI()
     local frame = CreateFrame("Frame", "BattlegroundMasterGUI", UIParent, "BasicFrameTemplateWithInset")
     self.guiFrame = frame
-    frame:SetSize(300, 400)
+    frame:SetSize(300, 500) -- Increased height to accommodate all buttons
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -411,7 +416,7 @@ function BGMFrame:CreateGUI()
                 end
             end
         end)
-        buttonY = buttonY - 30
+        buttonY = buttonY - 35 -- Increased spacing between buttons
     end
 
     local listButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -434,7 +439,7 @@ function BGMFrame:CreateGUI()
             end
         end
     end)
-    buttonY = buttonY - 30
+    buttonY = buttonY - 35
 
     local statsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     statsButton:SetSize(260, 25)
@@ -443,7 +448,7 @@ function BGMFrame:CreateGUI()
     statsButton:SetScript("OnClick", function()
         BattlegroundMaster:ShowSessionStats()
     end)
-    buttonY = buttonY - 30
+    buttonY = buttonY - 35
 
     local resetStatsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     resetStatsButton:SetSize(260, 25)
@@ -451,6 +456,22 @@ function BGMFrame:CreateGUI()
     resetStatsButton:SetText("Reset Session Stats")
     resetStatsButton:SetScript("OnClick", function()
         BattlegroundMaster:ResetStats()
+    end)
+    buttonY = buttonY - 35
+
+    local settingsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    settingsButton:SetSize(260, 25)
+    settingsButton:SetPoint("TOPLEFT", 20, buttonY)
+    settingsButton:SetText("Open Settings")
+    settingsButton:SetScript("OnClick", function()
+        BGMFrame:Print("Attempting to open settings panel...")
+        if BattlegroundMaster.optionsFrame then
+            InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster")
+            InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster") -- Double call to ensure it opens
+            BGMFrame:Print("Settings panel should be open now.")
+        else
+            BGMFrame:Print("Settings panel not registered. Check addon initialization.")
+        end
     end)
 end
 
@@ -480,6 +501,15 @@ function BGMFrame:Command(msg)
             end
         end
         self:Print("No Wintergrasp queue prompt found. Ensure you're queued and the prompt is active.")
+    elseif cmd == "config" then
+        BGMFrame:Print("Attempting to open settings panel...")
+        if BattlegroundMaster.optionsFrame then
+            InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster")
+            InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster") -- Double call to ensure it opens
+            BGMFrame:Print("Settings panel should be open now.")
+        else
+            BGMFrame:Print("Settings panel not registered. Check addon initialization.")
+        end
     elseif BG_DATA[cmd] then
         local status
         for i = 1, MAX_BATTLEFIELD_QUEUES do
@@ -533,6 +563,7 @@ function BGMFrame:Command(msg)
         self:Print("/bm autorequeue - Toggle auto-requeue")
         self:Print("/bm stats - Show session stats")
         self:Print("/bm resetstats - Reset session stats")
+        self:Print("/bm config - Open settings panel")
     end
 end
 

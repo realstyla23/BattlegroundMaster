@@ -16,6 +16,18 @@ function BattlegroundMaster:OnInitialize()
             lastHonor = 0,
             wins = 0,
             losses = 0,
+            autoRequeueDelay = 5, -- Default delay in seconds
+            debugMode = false, -- Debug mode toggle
+            autoRequeuePerBG = { -- Per-BG auto-requeue settings
+                av = true,
+                wsg = true,
+                ab = true,
+                eots = true,
+                sota = true,
+                ioc = true,
+                random = true,
+                wintergrasp = true,
+            },
             minimap = {
                 hide = false,
                 minimapPos = 225
@@ -56,6 +68,19 @@ function BattlegroundMaster:OnInitialize()
             _G.BattlegroundMaster = self
         end
         BattlegroundMaster = _G.BattlegroundMaster
+    end)
+
+    -- Delay settings panel registration to ensure Blizzard UI is ready
+    C_Timer.After(2, function()
+        local AceConfig = LibStub("AceConfig-3.0")
+        local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+        AceConfig:RegisterOptionsTable("BattlegroundMaster", self:GetOptions())
+        self.optionsFrame = AceConfigDialog:AddToBlizOptions("BattlegroundMaster", "BattlegroundMaster")
+        if not self.optionsFrame then
+            self:Print("Failed to register settings panel after delay. Check Ace3 libraries.")
+        else
+            self:Print("Settings panel registered successfully after delay.")
+        end
     end)
 
     self:Print("BattlegroundMaster loaded.")
@@ -102,6 +127,9 @@ end
 
 function BattlegroundMaster:Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99BattlegroundMaster|r: "..msg)
+    if self.db.profile.debugMode then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99[DEBUG] BattlegroundMaster|r: "..msg)
+    end
 end
 
 function BattlegroundMaster:ShowSessionStats()

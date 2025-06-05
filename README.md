@@ -1,83 +1,207 @@
 BattlegroundMaster
 
-A World of Warcraft (3.3.5a) addon designed to streamline battleground queue management, including auto-queueing for Wintergrasp. Simplify your PvP experience with automated queuing, session stats tracking, and an intuitive GUI.
+Overview
+
+BattlegroundMaster is a World of Warcraft addon designed for WoW 3.3.5a (Wrath of the Lich King) to automate and simplify battleground queue management. It offers features like auto-requeue, session stat tracking, and a user-friendly GUI, making your PvP experience smoother and more efficient.
+
 Features
 
-    Auto-Queue for Wintergrasp: Automatically joins the Wintergrasp queue when you're in the zone (if enabled).
-    Auto-Requeue for Battlegrounds: Re-queues for the last battleground after it ends (if enabled). Correctly re-queues for Random Battleground if that was your original selection.
-    GUI for Easy Management: A user-friendly interface with buttons to manage battleground queues effortlessly.
-    Slash Commands: Quick and convenient commands to control the addon, queue for battlegrounds, and view stats.
-    Session Stats Tracking: Monitors honor, kills, wins, and losses per session, with options to view and reset stats.
-    Minimap Integration: Adds a minimap icon for fast access to the GUI.
-    Streamlined Output: Minimal chat feedback for a cleaner experience, displaying only essential information like queued battlegrounds and auto-requeue status.
 
-Getting Started
+
+
+
+Automated Queuing: Queue for battlegrounds directly from a GUI or via chat commands (/bm <bg>).
+
+
+
+Auto-Requeue: Automatically requeue for battlegrounds after a match ends, with configurable delays and per-BG settings.
+
+
+
+Wintergrasp Auto-Queue: Automatically join Wintergrasp queues when in the zone, with support for auto-accepting prompts.
+
+
+
+Session Stats Tracking: Track honor, kills, wins, and losses for your session, with options to view and reset stats.
+
+
+
+Minimap Button: Toggle the GUI with a minimap button, customizable via settings.
+
+
+
+GUI Interface: A clean, draggable GUI to manage settings, queue for BGs, and view stats.
+
+
+
+Settings Panel: Configure options via Blizzard’s Interface Options (/bm config).
+
+
+
+Debug Mode: Optional debug logging for troubleshooting.
+
 Installation
 
-    Download the addon and copy the BattlegroundMaster folder into your WoW Interface/AddOns directory.
-    Launch World of Warcraft and enable the addon in the character selection screen.
-    In-game, type /bm to open the GUI or click the minimap icon to get started.
 
-First Steps
 
-    Open the GUI with /bm to explore the interface.
-    Enable auto-requeue with /bm autorequeue to automatically re-queue after battlegrounds.
-    Queue for a battleground using /bm <bgKey> (e.g., /bm ab for Arathi Basin).
-    Track your session stats with /bm stats.
 
-Commands
 
-    /bm - Toggles the GUI.
-    /bm <bgKey> - Joins or leaves a battleground. Supported keys: av (Alterac Valley), wsg (Warsong Gulch), ab (Arathi Basin), eots (Eye of the Storm), sota (Strand of the Ancients), ioc (Isle of Conquest), random (Random Battleground).
-    /bm joinwintergrasp - Manually accepts the Wintergrasp queue.
-    /bm list - Displays active queues.
-    /bm autorequeue - Toggles auto-requeue for battlegrounds.
-    /bm stats - Shows session honor, kills, wins, and losses.
-    /bm resetstats - Resets session stats.
+Download the latest release from GitHub.
 
-Changelog
-Version 1.2.1 (June 2025)
 
-    Auto-Requeue Fix for Random BG: Fixed auto-requeue to re-queue for Random Battleground if the original queue was for Random Battleground, instead of the specific battleground played.
 
-Version 1.2 (June 2025)
+Extract the BattlegroundMaster folder to your WoW Interface\AddOns\ directory.
 
-    Win/Loss Stats: Added tracking of battleground wins and losses per session, displayed with /bm stats and reset with /bm resetstats. Detected using GetBattlefieldWinner() when a battleground ends.
-    Deserter Debuff Detection: Added a check to prevent auto-requeue if the player has the Deserter debuff.
-    Auto-Requeue Improvement: Updated auto-requeue to target the specific battleground that ended, tracked via activeBGs.
-    Active Battlefield Detection: Improved detection to check all slots in JoinQueue and auto-requeue logic.
-    Code Cleanup: Removed redundant queue slot management, added better error messages, and simplified event handling.
 
-Version 1.1 (June 2025)
 
-    Auto-Requeue Fix: Updated auto-requeue to re-run the original manual command (e.g., /bm ab) after a battleground ends, ensuring compatibility with custom servers.
-    Streamlined Chat Output: Reduced verbose debug messages to show only essential feedback (e.g., queued battlegrounds, auto-requeue status).
-    Improved Wintergrasp Auto-Queue: Enhanced with robust detection using polling and event-based methods; added zone validation.
-    Code Optimization: Removed duplicate event handling; centralized battleground logic in BattlegroundMaster.lua.
-    Enhanced Reliability: Added safety checks and retry limits in FindAndClickScroll.
-    GUI Improvements: Added "List Active Queues" button and synced checkboxes with commands.
+Launch WoW, enable the addon in the character selection screen, and enjoy!
 
-Version 1.0 (Initial Release)
+Usage
 
-    Initial release with core features: Wintergrasp auto-queue, GUI, slash commands, and session stats tracking.
 
-Troubleshooting
 
-    Auto-requeue not working? Ensure you’ve queued manually first with /bm <bgKey> and that auto-requeue is enabled with /bm autorequeue.
-    Custom server issues? Report any unique chat messages or PvP frame behavior on the GitHub Issues page for tailored fixes.
-    Stats not updating? Reset stats with /bm resetstats and ensure you’re in a battleground for stats to track.
+
+
+Toggle GUI: Use /bm to open/close the GUI.
+
+
+
+Queue for a BG: Use /bm <bg> (e.g., /bm av for Alterac Valley) or click a BG button in the GUI.
+
+
+
+List Active Queues: Use /bm list or the "List Active Queues" button in the GUI.
+
+
+
+Auto-Requeue: Enable via the GUI checkbox or /bm autorequeue.
+
+
+
+Wintergrasp Auto-Queue: Enable via the GUI checkbox; works only in Wintergrasp zone.
+
+
+
+View Stats: Use /bm stats or the "Show Session Stats" button.
+
+
+
+Reset Stats: Use /bm resetstats or the "Reset Session Stats" button.
+
+
+
+Open Settings: Use /bm config or the "Open Settings" button to access the settings panel.
+
+
+
+Supported BGs: Alterac Valley (av), Warsong Gulch (wsg), Arathi Basin (ab), Eye of the Storm (eots), Strand of the Ancients (sota), Isle of Conquest (ioc), Random BG (random), Wintergrasp (wintergrasp).
+
+Version 1.3 Changelog
+
+
+
+
+
+Settings Panel Fix: Resolved issues with the settings panel not opening by adding delayed registration and ensuring all Ace3 dependencies are included (AceConfigRegistry-3.0 and AceConfigCmd-3.0).
+
+
+
+GUI Improvements: Adjusted frame size to 300x500 and increased button spacing for better visibility.
+
+
+
+Bug Fixes: Fixed library path issues in the .toc file to match the updated folder structure.
+
+
+
+Stability Enhancements: Added debug checks to confirm settings panel registration.
+
+Dependencies
+
+
+
+
+
+Ace3 libraries (included in the Libs folder):
+
+
+
+
+
+LibStub
+
+
+
+CallbackHandler-1.0
+
+
+
+AceAddon-3.0
+
+
+
+AceConsole-3.0
+
+
+
+AceEvent-3.0
+
+
+
+AceDB-3.0
+
+
+
+AceTimer-3.0
+
+
+
+AceGUI-3.0
+
+
+
+AceConfig-3.0 (with AceConfigRegistry-3.0 and AceConfigCmd-3.0)
+
+
+
+AceConfigDialog-3.0
+
+
+
+LibDBIcon-1.0
+
+
+
+LibDataBroker-1.1
+
+Known Issues
+
+
+
+
+
+Wintergrasp auto-queue requires you to be in the Wintergrasp zone to function.
+
+
+
+Auto-requeue skips if you have the Deserter debuff or are in an active battlefield.
 
 Contributing
 
-    Bug Reports and Feature Requests: Submit issues or suggestions on the GitHub Issues page.
-    Testing: Test new features and provide feedback to help improve the addon.
-    Code Contributions: Fork the repository, make changes, and submit a pull request for review.
-
-Credits
-
-    Developed with contributions from the WoW addon community.
-    Special thanks to users on GitHub for feedback and testing.
+Feel free to fork this repository, make improvements, and submit pull requests. Bug reports and feature requests are welcome via GitHub Issues.
 
 License
 
 This addon is released under the MIT License. See the LICENSE file for details.
+
+Credits
+
+
+
+
+
+Author: Shadowsinyou
+
+
+
+Libraries: Thanks to the Ace3 team and contributors for their amazing libraries.
