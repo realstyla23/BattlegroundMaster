@@ -16,13 +16,13 @@ function BattlegroundMaster:OnInitialize()
             lastHonor = 0,
             wins = 0,
             losses = 0,
-            lifetimeHonor = 0, -- New: Track lifetime honor
-            lifetimeKills = 0, -- New: Track lifetime kills
-            lifetimeWins = 0,  -- New: Track lifetime wins
-            lifetimeLosses = 0, -- New: Track lifetime losses
-            autoRequeueDelay = 5, -- Default delay in seconds
-            debugMode = false, -- Debug mode toggle
-            autoRequeuePerBG = { -- Per-BG auto-requeue settings
+            lifetimeHonor = 0,
+            lifetimeKills = 0,
+            lifetimeWins = 0,
+            lifetimeLosses = 0,
+            autoRequeueDelay = 5,
+            debugMode = false,
+            autoRequeuePerBG = {
                 av = true,
                 wsg = true,
                 ab = true,
@@ -66,6 +66,50 @@ function BattlegroundMaster:OnInitialize()
     self:RegisterEvent("PLAYER_PVP_KILLS_CHANGED")
     self:RegisterEvent("UPDATE_BATTLEFIELD_SCORE")
 
+    -- Hook StaticPopup_Show for Wintergrasp auto-queue
+    hooksecurefunc("StaticPopup_Show", function(which, textArg1, textArg2, data)
+        if BattlegroundMaster.db.profile.autoWintergrasp then
+            local fullText = (textArg1 or "") .. (textArg2 or "")
+            local isWintergrasp = fullText:lower():find("wintergrasp") or fullText:lower():find("would you like to join the queue")
+            if isWintergrasp then
+                local printFunc = BGMFrame and BGMFrame.Print or BattlegroundMaster.Print
+                if BattlegroundMaster.db.profile.debugMode then
+                    printFunc(BGMFrame or BattlegroundMaster, "[DEBUG] Wintergrasp: Popup triggered, which=" .. tostring(which) .. ", fullText=" .. fullText)
+                end
+                for i = 1, 4 do
+                    local popup = _G["StaticPopup" .. i]
+                    if popup and popup:IsShown() then
+                        if BattlegroundMaster.db.profile.debugMode then
+                            printFunc(BGMFrame or BattlegroundMaster, "[DEBUG] Wintergrasp: Found shown popup: StaticPopup" .. i)
+                        end
+                        local button = _G["StaticPopup" .. i .. "Button1"]
+                        if button then
+                            if BattlegroundMaster.db.profile.debugMode then
+                                printFunc(BGMFrame or BattlegroundMaster, "[DEBUG] Wintergrasp: Button1 found, label=" .. (button:GetText() or "nil") .. ", enabled=" .. tostring(button:IsEnabled()) .. ", visible=" .. tostring(button:IsVisible()))
+                            end
+                            C_Timer.After(0.5, function() -- Increased delay for Warmane UI
+                                if button:IsEnabled() and button:IsVisible() and (button:GetText() and (button:GetText():lower():find("accept") or button:GetText():lower():find("okay"))) then
+                                    button:Click()
+                                    if BattlegroundMaster.db.profile.debugMode then
+                                        printFunc(BGMFrame or BattlegroundMaster, "Auto-accepted Wintergrasp queue.")
+                                    end
+                                else
+                                    if BattlegroundMaster.db.profile.debugMode then
+                                        printFunc(BGMFrame or BattlegroundMaster, "[DEBUG] Wintergrasp: Failed to accept - Button state: enabled=" .. tostring(button:IsEnabled()) .. ", visible=" .. tostring(button:IsVisible()) .. ", text=" .. (button:GetText() or "nil"))
+                                    end
+                                end
+                            end)
+                            return
+                        end
+                    end
+                end
+                if BattlegroundMaster.db.profile.debugMode then
+                    printFunc(BGMFrame or BattlegroundMaster, "[DEBUG] Wintergrasp: No valid popup found with Accept or Okay button.")
+                end
+            end
+        end
+    end)
+
     -- Delay global assignment to ensure Ace3 is done
     C_Timer.After(1, function()
         if not _G.BattlegroundMaster then
@@ -92,7 +136,11 @@ end
 
 function BattlegroundMaster:ADDON_LOADED(event, addon)
     if addon == "BattlegroundMaster" then
-        BGMFrame:CreateGUI()
+        if BGMFrame and BGMFrame.CreateGUI then
+            BGMFrame:CreateGUI()
+        else
+            self:Print("Error: BGMFrame or CreateGUI not available.")
+        end
     end
 end
 
@@ -113,7 +161,7 @@ function BattlegroundMaster:PLAYER_PVP_KILLS_CHANGED()
 
     if delta > 0 then
         self.db.profile.sessionKills = (self.db.profile.sessionKills or 0) + delta
-        self.db.profile.lifetimeKills = (self.db.profile.lifetimeKills or 0) + delta -- Update lifetime kills
+        self.db.profile.lifetimeKills = (self.db.profile.lifetimeKills or 0) + delta
         self:Print("Honorable kills gained: "..delta..". Total Session Kills: "..self.db.profile.sessionKills)
     end
 
@@ -125,16 +173,18 @@ function BattlegroundMaster:UPDATE_BATTLEFIELD_SCORE()
     local honorGained = currentHonor - (self.db.profile.lastHonor or 0)
     if honorGained > 0 then
         self.db.profile.sessionHonor = (self.db.profile.sessionHonor or 0) + honorGained
-        self.db.profile.lifetimeHonor = (self.db.profile.lifetimeHonor or 0) + honorGained -- Update lifetime honor
+        self.db.profile.lifetimeHonor = (self.db.profile.lifetimeHonor or 0) + honorGained
         self.db.profile.lastHonor = currentHonor
         self:Print("Honor gained: "..honorGained..". Total Session Honor: "..self.db.profile.sessionHonor)
     end
 end
 
 function BattlegroundMaster:Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99BattlegroundMaster|r: "..msg)
-    if self.db.profile.debugMode then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99[DEBUG] BattlegroundMaster|r: "..msg)
+    if DEFAULT_CHAT_FRAME then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99BattlegroundMaster|r: "..msg)
+        if self.db.profile.debugMode then
+            DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99[DEBUG] BattlegroundMaster|r: "..msg)
+        end
     end
 end
 
@@ -164,12 +214,12 @@ end
 
 function BattlegroundMaster:IncrementWins()
     self.db.profile.wins = (self.db.profile.wins or 0) + 1
-    self.db.profile.lifetimeWins = (self.db.profile.lifetimeWins or 0) + 1 -- Update lifetime wins
+    self.db.profile.lifetimeWins = (self.db.profile.lifetimeWins or 0) + 1
     self:Print("Battleground won! Total Session Wins: "..self.db.profile.wins)
 end
 
 function BattlegroundMaster:IncrementLosses()
     self.db.profile.losses = (self.db.profile.losses or 0) + 1
-    self.db.profile.lifetimeLosses = (self.db.profile.lifetimeLosses or 0) + 1 -- Update lifetime losses
+    self.db.profile.lifetimeLosses = (self.db.profile.lifetimeLosses or 0) + 1
     self:Print("Battleground lost. Total Session Losses: "..self.db.profile.losses)
 end

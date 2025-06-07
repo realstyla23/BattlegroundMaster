@@ -1,10 +1,9 @@
 local BGMFrame = CreateFrame("Frame", "BGMFrame", UIParent)
 BGMFrame.queueNames = BGMFrame.queueNames or {}
-BGMFrame.lastQueuedBG = nil -- Track last queued BG for manual queuing
-BGMFrame.inWintergrasp = false -- Track if in Wintergrasp for polling
-BGMFrame.activeBGs = {} -- Track active battlegrounds for auto-requeue
+BGMFrame.lastQueuedBG = nil
+BGMFrame.inWintergrasp = false
+BGMFrame.activeBGs = {}
 
--- BG Data without slot numbers, as we’ll use the PvP frame for all queuing
 local BG_DATA = {
     ["av"] = { name = "Alterac Valley", color = "3399ff", pattern = "alterac", scrollUp = true },
     ["wsg"] = { name = "Warsong Gulch", color = "ff0000", pattern = "warsong", scrollUp = true },
@@ -16,12 +15,10 @@ local BG_DATA = {
     ["wintergrasp"] = { name = "Wintergrasp", color = "ff66cc", pattern = "wintergrasp", scrollUp = false }
 }
 
--- Print function
 BGMFrame.Print = function(self, msg)
     BattlegroundMaster:Print(msg)
 end
 
--- Helper function to get BG key from map name
 function BGMFrame:GetBGKeyFromMapName(mapName)
     for key, bg in pairs(BG_DATA) do
         if bg.name:lower() == mapName:lower() then
@@ -31,7 +28,6 @@ function BGMFrame:GetBGKeyFromMapName(mapName)
     return nil
 end
 
--- Check for deserter debuff
 function BGMFrame:HasDeserterDebuff()
     for i = 1, 40 do
         local name = UnitDebuff("player", i)
@@ -42,7 +38,6 @@ function BGMFrame:HasDeserterDebuff()
     return false
 end
 
--- Check if player is in an active battlefield
 function BGMFrame:IsInActiveBattlefield()
     for i = 1, MAX_BATTLEFIELD_QUEUES do
         local status = GetBattlefieldStatus(i)
@@ -53,7 +48,6 @@ function BGMFrame:IsInActiveBattlefield()
     return false
 end
 
--- JoinQueue function for manual queuing
 function BGMFrame:JoinQueue(bgKey)
     local bgInfo = BG_DATA[bgKey:lower()]
     if not bgInfo then
@@ -72,7 +66,6 @@ function BGMFrame:JoinQueue(bgKey)
     self.lastQueuedBG = bgKey
     self:Print("Queuing for " .. bgInfo.name)
 
-    -- Check if player is in a battleground or active battlefield
     if UnitInBattleground("player") then
         self:Print("Cannot queue: Player is still in a battleground.")
         return
@@ -82,7 +75,6 @@ function BGMFrame:JoinQueue(bgKey)
         return
     end
 
-    -- Find an empty queue slot
     local slot
     for i = 1, MAX_BATTLEFIELD_QUEUES do
         if GetBattlefieldStatus(i) == "none" then
@@ -95,11 +87,10 @@ function BGMFrame:JoinQueue(bgKey)
         return
     end
 
-    -- Attempt to open and interact with the PvP frame with retries
     local function attemptQueue(attempts)
         attempts = attempts or 1
         local maxAttempts = 5
-        local delay = 5 -- Delay in seconds between attempts
+        local delay = 5
 
         if attempts > maxAttempts then
             self:Print("Failed to queue for " .. bgInfo.name .. " after " .. maxAttempts .. " attempts.")
@@ -125,7 +116,6 @@ function BGMFrame:JoinQueue(bgKey)
             return
         end
 
-        -- Close PvP window
         if PVPParentFrame and PVPParentFrame:IsShown() then
             ToggleFrame(PVPParentFrame)
         end
@@ -217,40 +207,12 @@ function BGMFrame:FindAndClickScroll(bgInfo)
         end
     end
 
-    -- Reset scroll position to top
     for i = 1, maxScrollAttempts do
         scrollUpButton:Click()
     end
     C_Timer.After(0.1, searchAndScroll)
 end
 
--- Polling Function for Wintergrasp Queue and Popup
-local function PollForWintergraspQueueAndPopup()
-    if not BGMFrame.inWintergrasp or not BattlegroundMaster.db.profile.autoWintergrasp then
-        return
-    end
-    for i = 1, MAX_BATTLEFIELD_QUEUES do
-        local status, mapName = GetBattlefieldStatus(i)
-        if status == "confirm" and mapName and mapName:lower():find("wintergrasp") then
-            BGMFrame:Print("Polling detected Wintergrasp confirm status, accepting!")
-            AcceptBattlefieldPort(i, true)
-        end
-    end
-    -- Check for Wintergrasp popup and click the accept button
-    if BattlegroundMaster.db.profile.autoWintergrasp then
-        local popup = _G["StaticPopup1"]
-        if popup and popup:IsShown() and popup.which == "CONFIRM_BATTLEFIELD_ENTRY" then
-            local button = _G["StaticPopup1Button1"]
-            if button and button:IsEnabled() and button:IsVisible() then
-                BGMFrame:Print("Auto-accepting Wintergrasp queue prompt.")
-                button:Click()
-            end
-        end
-    end
-    C_Timer.After(1, PollForWintergraspQueueAndPopup)
-end
-
--- Consolidated Event Handling
 BGMFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 BGMFrame:RegisterEvent("CHAT_MSG_BG_SYSTEM_NEUTRAL")
 BGMFrame:RegisterEvent("UPDATE_BATTLEFIELD_STATUS")
@@ -262,7 +224,6 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
             self:Print("Entered Wintergrasp, Wintergrasp auto-queue enabled.")
             self.inWintergrasp = true
             self:JoinQueue("wintergrasp")
-            PollForWintergraspQueueAndPopup()
         else
             self.inWintergrasp = false
             if BattlegroundMaster.db.profile.autoWintergrasp then
@@ -272,7 +233,7 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "CHAT_MSG_BG_SYSTEM_NEUTRAL" then
         local message = ...
         if message:lower():find("wintergrasp") and (message:find("join") or message:find("would you like to")) and BattlegroundMaster.db.profile.autoWintergrasp then
-            self:Print("Wintergrasp queue prompt detected via chat message, polling for popup.")
+            self:Print("Wintergrasp queue prompt detected via chat message.")
         end
     elseif event == "UPDATE_BATTLEFIELD_STATUS" then
         local index = ...
@@ -285,13 +246,7 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         
-        if status == "confirm" and mapName and mapName:lower():find("wintergrasp") and BattlegroundMaster.db.profile.autoWintergrasp then
-            self:Print("Wintergrasp queue confirm detected via status update, accepting!")
-            AcceptBattlefieldPort(index, true)
-        end
-        
         if status == "none" and self.queueNames[index] then
-            -- Win/Loss detection
             local winner = GetBattlefieldWinner()
             if winner then
                 local playerFaction = UnitFactionGroup("player")
@@ -302,15 +257,12 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
                 end
             end
             
-            -- Auto-requeue logic
             if BattlegroundMaster.db.profile.autoRequeue then
                 local bgKey = self.activeBGs[index]
                 if bgKey then
-                    -- Check if auto-requeue is enabled for this BG
                     if not BattlegroundMaster.db.profile.autoRequeuePerBG[bgKey] then
                         self:Print("Auto-requeue skipped: Disabled for " .. BG_DATA[bgKey].name .. " in settings.")
                     else
-                        -- If originally queued for random, re-queue for random
                         local requeueKey = (self.lastQueuedBG == "random" and bgKey ~= "wintergrasp") and "random" or bgKey
                         self:Print("Auto-requeue for " .. BG_DATA[requeueKey].name .. " in " .. BattlegroundMaster.db.profile.autoRequeueDelay .. " seconds...")
                         C_Timer.After(BattlegroundMaster.db.profile.autoRequeueDelay, function()
@@ -333,11 +285,10 @@ BGMFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
--- GUI Creation
 function BGMFrame:CreateGUI()
     local frame = CreateFrame("Frame", "BattlegroundMasterGUI", UIParent, "BasicFrameTemplateWithInset")
     self.guiFrame = frame
-    frame:SetSize(420, 300) -- Updated to 420x300 as requested
+    frame:SetSize(420, 300)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -346,12 +297,10 @@ function BGMFrame:CreateGUI()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:SetClampedToScreen(true)
 
-    -- Title
     frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.title:SetPoint("TOP", 0, -5) -- Moved higher to align better
+    frame.title:SetPoint("TOP", 0, -5)
     frame.title:SetText("|cff33ff99BattlegroundMaster|r")
 
-    -- Auto-Requeue Checkbox (Left)
     frame.autoRequeueCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     frame.autoRequeueCheck:SetPoint("TOPLEFT", 20, -40)
     frame.autoRequeueCheck.text = frame.autoRequeueCheck:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -363,7 +312,6 @@ function BGMFrame:CreateGUI()
         BGMFrame:Print("Auto-requeue " .. (BattlegroundMaster.db.profile.autoRequeue and "enabled" or "disabled") .. ".")
     end)
 
-    -- Wintergrasp Auto-Queue Checkbox (Right)
     frame.autoWintergraspCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     frame.autoWintergraspCheck:SetPoint("TOPRIGHT", -170, -40)
     frame.autoWintergraspCheck.text = frame.autoWintergraspCheck:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -375,7 +323,6 @@ function BGMFrame:CreateGUI()
         BGMFrame:Print("Wintergrasp auto-queue " .. (BattlegroundMaster.db.profile.autoWintergrasp and "enabled" or "disabled") .. " (only active in Wintergrasp zone).")
     end)
 
-    -- Battleground Buttons (Left Column)
     local bgY = -70
     local bgKeys = {}
     for key, bgInfo in pairs(BG_DATA) do
@@ -391,7 +338,7 @@ function BGMFrame:CreateGUI()
     for _, bgKey in ipairs(bgKeys) do
         local bgInfo = BG_DATA[bgKey]
         local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-        button:SetSize(180, 25) -- Increased width to 180 for longer names
+        button:SetSize(180, 25)
         button:SetPoint("TOPLEFT", 20, bgY)
         button:SetText(bgInfo.name)
         button:SetScript("OnClick", function()
@@ -415,7 +362,6 @@ function BGMFrame:CreateGUI()
         bgY = bgY - 30
     end
 
-    -- Misc Buttons (Right Column)
     local miscY = -70
     local miscButtons = {
         { text = "List Active Queues", func = function() 
@@ -441,7 +387,7 @@ function BGMFrame:CreateGUI()
             BGMFrame:Print("Attempting to open settings panel...")
             if BattlegroundMaster.optionsFrame then
                 InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster")
-                InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster") -- Double call to ensure it opens
+                InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster")
                 BGMFrame:Print("Settings panel should be open now.")
             else
                 BGMFrame:Print("Settings panel not registered. Check addon initialization.")
@@ -450,7 +396,7 @@ function BGMFrame:CreateGUI()
     }
     for _, buttonInfo in ipairs(miscButtons) do
         local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-        button:SetSize(180, 25) -- Increased width to 180 for consistency
+        button:SetSize(180, 25)
         button:SetPoint("TOPRIGHT", -20, miscY)
         button:SetText(buttonInfo.text)
         button:SetScript("OnClick", buttonInfo.func)
@@ -477,7 +423,8 @@ function BGMFrame:Command(msg)
     elseif cmd == "joinwintergrasp" then
         for i = 1, MAX_BATTLEFIELD_QUEUES do
             local status, mapName = GetBattlefieldStatus(i)
-            if status == "confirm" and mapName and mapName:lower():find("wintergrasp") then
+            BGMFrame:Print("[DEBUG] Wintergrasp: Manual check slot " .. i .. ": status=" .. tostring(status) .. ", mapName=" .. tostring(mapName))
+            if status and mapName and (status:lower():find("confirm") or status:lower():find("ready")) and mapName:lower():find("wintergrasp") then
                 AcceptBattlefieldPort(i, true)
                 self:Print("Manually accepted Wintergrasp queue!")
                 return
@@ -488,7 +435,7 @@ function BGMFrame:Command(msg)
         BGMFrame:Print("Attempting to open settings panel...")
         if BattlegroundMaster.optionsFrame then
             InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster")
-            InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster") -- Double call to ensure it opens
+            InterfaceOptionsFrame_OpenToCategory("BattlegroundMaster")
             BGMFrame:Print("Settings panel should be open now.")
         else
             BGMFrame:Print("Settings panel not registered. Check addon initialization.")
