@@ -50,6 +50,18 @@ BattlegroundMaster v1.5 is an upgraded version of the addon, offering improved a
 - Initial Wintergrasp auto-queue implementation with polling.
 - Added debug logging and GUI enhancements.
 
+### Version 1.3 (Previous Release)
+- Settings Panel Fix and GUI Improvements
+
+### Version 1.2 (Previous Release)
+- added Settings Panel some minor fixes
+
+### Version 1.1 (Previous Release)
+- added GUI and stat tracking
+
+### Version 1.0 (Previous Release)
+- initial release only had Auto-Queue for BGs. no GUI only commands. Winergrasp was not reliable
+
 ## Known Issues
 - No known issues in v1.5. Report any bugs via GitHub Issues.
 
